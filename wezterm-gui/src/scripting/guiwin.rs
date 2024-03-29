@@ -2,7 +2,7 @@
 use super::luaerr;
 use crate::termwindow::TermWindowNotif;
 use crate::TermWindow;
-use config::keyassignment::{ClipboardCopyDestination, KeyAssignment};
+use config::keyassignment::{ClipboardCopyDestination, ClipboardPasteSource, KeyAssignment};
 use luahelper::*;
 use mlua::{UserData, UserDataMethods, UserDataRef};
 use mux::pane::PaneId;
@@ -12,7 +12,7 @@ use mux_lua::MuxPane;
 use termwiz_funcs::lines_to_escapes;
 use wezterm_dynamic::{FromDynamic, ToDynamic};
 use wezterm_toast_notification::ToastNotification;
-use window::{Connection, ConnectionOps, DeadKeyStatus, WindowOps, WindowState};
+use window::{Clipboard, Connection, ConnectionOps, DeadKeyStatus, WindowOps, WindowState};
 
 #[derive(Clone)]
 pub struct GuiWin {
@@ -309,6 +309,14 @@ impl UserData for GuiWin {
                 Ok(())
             },
         );
+        methods.add_async_method("clipboard_contents", |_, this, clipboard: Option<ClipboardPasteSource>| async move {
+            let clipboard = match clipboard.unwrap_or_default() {
+                ClipboardPasteSource::Clipboard => Clipboard::Clipboard,
+                ClipboardPasteSource::PrimarySelection => Clipboard::PrimarySelection,
+            };
+            let clip = this.window.get_clipboard(clipboard).await;
+            Ok(clip.unwrap_or_default())
+        });
         methods.add_async_method(
             "get_selection_escapes_for_pane",
             |_, this, pane: UserDataRef<MuxPane>| async move {

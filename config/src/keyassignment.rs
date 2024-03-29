@@ -323,6 +323,7 @@ pub enum ClipboardPasteSource {
     Clipboard,
     PrimarySelection,
 }
+impl_lua_conversion_dynamic!(ClipboardPasteSource);
 
 impl Default for ClipboardPasteSource {
     fn default() -> Self {
