@@ -384,7 +384,7 @@ impl ImgCatCommand {
     }
 
     fn image_dimensions(data: &[u8]) -> anyhow::Result<ImageInfo> {
-        let reader = image::io::Reader::new(std::io::Cursor::new(data)).with_guessed_format()?;
+        let reader = image::ImageReader::new(std::io::Cursor::new(data)).with_guessed_format()?;
         let format = reader
             .format()
             .ok_or_else(|| anyhow::anyhow!("unknown image format!?"))?;
@@ -717,6 +717,9 @@ fn init_config(opts: &Opt) -> anyhow::Result<ConfigHandle> {
     .context("config::common_init")?;
     let config = config::configuration();
     config.update_ulimit()?;
+    if let Some(value) = &config.default_ssh_auth_sock {
+        std::env::set_var("SSH_AUTH_SOCK", value);
+    }
     Ok(config)
 }
 

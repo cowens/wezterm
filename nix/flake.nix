@@ -6,29 +6,34 @@
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # NOTE: @2024-05 Nix flakes does not support getting git submodules of 'self'.
+    # refs:
+    # - https://discourse.nixos.org/t/get-nix-flake-to-include-git-submodule/30324
+    # - https://github.com/NixOS/nix/pull/7862
+    #
+    # ... In the meantime we kinda duplicate the dependencies here then replace the submodules with
+    # links to each repo in package sources.
+    #
+    # Try to use tags when possible to increase readability
+    # (note: `git submodule status` in wezterm repo will show the `git describe` result for each
+    # submodule, can help finding a tag if any)
     freetype2 = {
-      url = "github:wez/freetype2/de8b92dd7ec634e9e2b25ef534c54a3537555c11";
+      url = "github:wez/freetype2/e4586d960f339cf75e2e0b34aee30a0ed8353c0d";
       flake = false;
     };
-
     harfbuzz = {
-      url = "github:harfbuzz/harfbuzz/60841e26187576bff477c1a09ee2ffe544844abc";
+      url = "github:harfbuzz/harfbuzz/8.4.0";
       flake = false;
     };
-
     libpng = {
       url = "github:glennrp/libpng/8439534daa1d3a5705ba92e653eda9251246dd61";
       flake = false;
     };
-
     zlib = {
-      url = "github:madler/zlib/cacf7f1d4e3d44d871b605da3b647f07d718623f";
+      url = "github:madler/zlib/v1.2.11";
       flake = false;
     };
   };
@@ -97,9 +102,7 @@
 
         cargoLock = {
           lockFile = ../Cargo.lock;
-          outputHashes = {
-            "xcb-imdkit-0.3.0" = "sha256-fTpJ6uNhjmCWv7dZqVgYuS2Uic36XNYTbqlaly5QBjI=";
-          };
+          allowBuiltinFetchGit = true;
         };
 
         preConfigure = ''
@@ -153,6 +156,8 @@
               tic -x -o $out/share/terminfo ${src}/termwiz/data/wezterm.terminfo
             '';
         };
+
+        meta.mainProgram = "wezterm";
       };
 
       devShell = pkgs.mkShell {
@@ -162,8 +167,12 @@
         buildInputs =
           buildInputs
           ++ (with pkgs.rust-bin; [
-            stable.latest.minimal
-            stable.latest.clippy
+            (stable.latest.minimal.override {
+              extensions = [
+                "clippy"
+                "rust-src"
+              ];
+            })
 
             nightly.latest.rustfmt
             nightly.latest.rust-analyzer

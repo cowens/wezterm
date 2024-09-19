@@ -99,6 +99,9 @@ fn run() -> anyhow::Result<()> {
     let config = config::configuration();
 
     config.update_ulimit()?;
+    if let Some(value) = &config.default_ssh_auth_sock {
+        std::env::set_var("SSH_AUTH_SOCK", value);
+    }
 
     #[cfg(unix)]
     let mut pid_file = None;
@@ -202,7 +205,7 @@ fn run() -> anyhow::Result<()> {
     }
 
     wezterm_blob_leases::register_storage(Arc::new(
-        wezterm_blob_leases::simple_tempdir::SimpleTempDir::new()?,
+        wezterm_blob_leases::simple_tempdir::SimpleTempDir::new_in(&*config::CACHE_DIR)?,
     ))?;
 
     let need_builder = !opts.prog.is_empty() || opts.cwd.is_some();

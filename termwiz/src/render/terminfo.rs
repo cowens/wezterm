@@ -48,7 +48,7 @@ impl TerminfoRenderer {
         });
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::cognitive_complexity))]
+    #[allow(clippy::cognitive_complexity)]
     fn flush_pending_attr<W: RenderTty + Write>(&mut self, out: &mut W) -> Result<()> {
         macro_rules! attr_on {
             ($cap:ident, $sgr:expr) => {{
@@ -149,7 +149,9 @@ impl TerminfoRenderer {
                 None => 0,
             };
 
-            if attr.foreground() != current_foreground {
+            if attr.foreground() != current_foreground
+                && self.caps.color_level() != ColorLevel::MonoChrome
+            {
                 match (has_true_color, attr.foreground()) {
                     (true, ColorAttribute::TrueColorWithPaletteFallback(tc, _))
                     | (true, ColorAttribute::TrueColorWithDefaultFallback(tc)) => {
@@ -183,7 +185,9 @@ impl TerminfoRenderer {
                 }
             }
 
-            if attr.background() != current_background {
+            if attr.background() != current_background
+                && self.caps.color_level() != ColorLevel::MonoChrome
+            {
                 match (has_true_color, attr.background()) {
                     (true, ColorAttribute::TrueColorWithPaletteFallback(tc, _))
                     | (true, ColorAttribute::TrueColorWithDefaultFallback(tc)) => {
@@ -326,10 +330,7 @@ impl TerminfoRenderer {
         Ok(())
     }
 
-    #[cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::cyclomatic_complexity, clippy::cognitive_complexity)
-    )]
+    #[allow(clippy::cyclomatic_complexity, clippy::cognitive_complexity)]
     pub fn render_to<W: RenderTty + Write>(
         &mut self,
         changes: &[Change],

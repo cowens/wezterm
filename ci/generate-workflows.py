@@ -136,7 +136,7 @@ class CacheStep(ActionStep):
 
 class SccacheStep(ActionStep):
     def __init__(self, name):
-        super().__init__(name, action="mozilla-actions/sccache-action@v0.0.4")
+        super().__init__(name, action="mozilla-actions/sccache-action@v0.0.5")
 
 
 class CheckoutStep(ActionStep):
@@ -379,6 +379,17 @@ rustup default {toolchain}
 """,
                 ),
             ]
+        elif "macos" in self.name:
+            steps += [
+                RunStep(
+                    name="Install Rust (ARM)",
+                    run="rustup target add aarch64-apple-darwin",
+                ),
+                RunStep(
+                    name="Install Rust (Intel)",
+                    run="rustup target add x86_64-apple-darwin",
+                )
+            ]
         else:
             steps += [
                 ActionStep(
@@ -386,13 +397,6 @@ rustup default {toolchain}
                     action=f"dtolnay/rust-toolchain@{toolchain}",
                     params=params,
                 ),
-            ]
-        if "macos" in self.name:
-            steps += [
-                RunStep(
-                    name="Install Rust (ARM)",
-                    run="rustup target add aarch64-apple-darwin",
-                )
             ]
         if cache:
             steps += [
@@ -424,40 +428,54 @@ rustup default {toolchain}
             )
         ]
 
-    def build_all_release(self):
+    def fixup_windows_path(self, cmd):
         if "win" in self.name:
-            return [
-                RunStep(
-                    name="Build (Release mode)",
-                    shell="cmd",
-                    run="""
-PATH C:\\Strawberry\\perl\\bin;%PATH%
-cargo build --all --release""",
-                )
-            ]
-        if "macos" in self.name:
-            return [
-                RunStep(
-                    name="Build (Release mode Intel)",
-                    run="cargo build --target x86_64-apple-darwin --all --release",
-                ),
-                RunStep(
-                    name="Build (Release mode ARM)",
-                    run="cargo build --target aarch64-apple-darwin --all --release",
-                ),
-            ]
-        if self.name == "centos7":
-            enable = "source /opt/rh/devtoolset-9/enable && "
-        else:
-            enable = ""
-        return [
-            RunStep(
-                name="Build (Release mode)", run=enable + "cargo build --all --release"
-            )
-        ]
+            return "PATH C:\\Strawberry\\perl\\bin;%PATH%\n" + cmd
+        return cmd
 
-    def test_all_release(self):
-        run = "cargo nextest run --all --release --no-fail-fast"
+    def build_all_release(self):
+        bin_crates = [
+            "wezterm",
+            "wezterm-gui",
+            "wezterm-mux-server",
+            "strip-ansi-escapes",
+        ]
+        steps = []
+        for bin in bin_crates:
+            if "win" in self.name:
+                steps += [
+                    RunStep(
+                        name=f"Build {bin} (Release mode)",
+                        shell="cmd",
+                        run=self.fixup_windows_path(f"cargo build -p {bin} --release"),
+                    )
+                ]
+            elif "macos" in self.name:
+                steps += [
+                    RunStep(
+                        name=f"Build {bin} (Release mode Intel)",
+                        run=f"cargo build --target x86_64-apple-darwin -p {bin} --release",
+                    ),
+                    RunStep(
+                        name=f"Build {bin} (Release mode ARM)",
+                        run=f"cargo build --target aarch64-apple-darwin -p {bin} --release",
+                    ),
+                ]
+            else:
+                if self.name == "centos7":
+                    enable = "source /opt/rh/devtoolset-9/enable && "
+                else:
+                    enable = ""
+                steps += [
+                    RunStep(
+                        name=f"Build {bin} (Release mode)",
+                        run=enable + f"cargo build -p {bin} --release",
+                    )
+                ]
+        return steps
+
+    def test_all(self):
+        run = "cargo nextest run --all --no-fail-fast"
         if "macos" in self.name:
             run += " --target=x86_64-apple-darwin"
         if self.name == "centos7":
@@ -466,10 +484,9 @@ cargo build --all --release""",
             # Install cargo-nextest
             InstallCrateStep("cargo-nextest", key=self.name),
             # Run tests
-            RunStep(
-                name="Test (Release mode)",
-                run=run,
-            ),
+            RunStep(name="Test", run=self.fixup_windows_path(run), shell="cmd")
+            if "win" in self.name
+            else RunStep(name="Test", run=run),
         ]
 
     def package(self, trusted=False):
@@ -799,6 +816,8 @@ cargo build --all --release""",
             self.env["MACOSX_DEPLOYMENT_TARGET"] = "10.9"
         if "alpine" in self.name:
             self.env["RUSTFLAGS"] = "-C target-feature=-crt-static"
+        if "win" in self.name:
+            self.env["RUSTUP_WINDOWS_PATH_ADD_BIN"] = "1"
         return
 
     def prep_environment(self, cache=True):
@@ -892,14 +911,14 @@ cargo build --all --release""",
         steps += self.install_openssh_server()
         steps += self.checkout()
         # We should be able to cache mac builds now?
-        steps += self.install_rust() # cache="mac" not in self.name)
+        steps += self.install_rust()  # cache="mac" not in self.name)
         steps += self.install_system_deps()
         return steps
 
     def pull_request(self):
         steps = self.prep_environment()
         steps += self.build_all_release()
-        steps += self.test_all_release()
+        steps += self.test_all()
         steps += self.package()
         steps += self.upload_artifact()
 
@@ -928,7 +947,7 @@ cargo build --all --release""",
     def continuous(self):
         steps = self.prep_environment()
         steps += self.build_all_release()
-        steps += self.test_all_release()
+        steps += self.test_all()
         steps += self.package(trusted=True)
         steps += self.upload_artifact_nightly()
 
@@ -952,7 +971,7 @@ cargo build --all --release""",
     def tag(self):
         steps = self.prep_environment()
         steps += self.build_all_release()
-        steps += self.test_all_release()
+        steps += self.test_all()
         steps += self.package(trusted=True)
         steps += self.upload_artifact()
         steps += self.update_homebrew_tap()
@@ -979,6 +998,7 @@ cargo build --all --release""",
 TARGETS = [
     Target(container="ubuntu:20.04", continuous_only=True, app_image=True),
     Target(container="ubuntu:22.04", continuous_only=True),
+    Target(container="ubuntu:24.04", continuous_only=True),
     # debian 8's wayland libraries are too old for wayland-client
     # Target(container="debian:8.11", continuous_only=True, bootstrap_git=True),
     # harfbuzz's C++ is too new for debian 9's toolchain
@@ -986,13 +1006,12 @@ TARGETS = [
     Target(container="debian:10.3", continuous_only=True),
     Target(container="debian:11", continuous_only=True),
     Target(container="debian:12", continuous_only=True),
-    Target(name="centos8", container="quay.io/centos/centos:stream8"),
     Target(name="centos9", container="quay.io/centos/centos:stream9"),
-    Target(name="macos", os="macos-11"),
+    Target(name="macos", os="macos-latest"),
     # https://fedoraproject.org/wiki/End_of_life?rd=LifeCycle/EOL
-    Target(container="fedora:37"),
     Target(container="fedora:38"),
     Target(container="fedora:39"),
+    Target(container="fedora:40"),
     # Target(container="alpine:3.15"),
     Target(name="windows", os="windows-latest", rust_target="x86_64-pc-windows-msvc"),
 ]
