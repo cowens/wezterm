@@ -46,6 +46,9 @@ As features stabilize some brief notes about them will accumulate here.
 * Improved startup performance on X11. Thanks to @blukai! #5923 #5802
 * There is now an upper bound of 999,999,999 for `scrollback_lines`. Thanks to
   @x3ro! #5996
+* Migrated serial support to the `serial2` rust crate. This opens the door
+  to more convenient serial support going forward. Thanks to @jeevithakannan2!
+  #6411 #6460
 
 #### New
 * [wezterm.serde](config/lua/wezterm.serde/index.md) module for serialization
@@ -63,6 +66,8 @@ As features stabilize some brief notes about them will accumulate here.
 * [show_close_tab_button_in_tabs](config/lua/config/show_close_tab_button_in_tabs.md)
   option for the fancy tab bar. Thanks to @zummenix! #3818
 * wezterm-ssh now supports `ProxyUseFdPass`. Thanks to @loops! #6103 #6093
+* `PromptInputLine` now supports a optional `prompt` and `initial_value`
+  parameters. Thanks to @mgpinf and @ekorchmar! #6054 #6007
 
 #### Fixed
 * Race condition when very quickly adjusting font scale, and other improvements
@@ -111,7 +116,7 @@ As features stabilize some brief notes about them will accumulate here.
 * DECSLRM incorrectly clamped the left margin based on the terminal height
   instead of the terminal width. Thanks to @j4james and @tmccombs! #5871 #5750
 * Scrollback position was incorrectly advanced when in alt-screen mode.
-  Thanks to @tbung! #6099 #4607
+  Thanks to @tbung and @loops! #6099 #4607 #6186
 * Wayland: Fixed potential panic on startup when monitors have changed are
   in the process of hot plugging when wezterm starts. Thanks to @loops! #6084
 * macOS: explicitly set the window to sRGB colorspace to resolve incorrect
@@ -128,6 +133,10 @@ As features stabilize some brief notes about them will accumulate here.
   @joncrangle! #5883
 * zooming a tab might not work if you also recently used `pane:activate()`.
   Thanks to @SpyMachine! #5964 #5928
+* `pane:current_working_dir.file_path` returned incorrect results for
+  paths that contained `#` or `?` characters. Thanks to @loops! #6158 #6171
+* wayland: issues with losing maximized or tiled state when switching between
+  applications. Thanks to @aliaksandr-trush! #4568 #5897
 
 #### Updated
 * Bundled conpty.dll and OpenConsole.exe to build 1.19.240130002.nupkg
